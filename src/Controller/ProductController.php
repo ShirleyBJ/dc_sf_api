@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Entity\Category;
 use App\Entity\Product;
+use App\Service\Validator;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -28,87 +29,110 @@ class ProductController extends AbstractController
     {
         $product = $em->getRepository(Product::class)->findOneById($id);
         if ($product === null) {
-            return new JsonResponse('Produit introuvable', 404); //retourne un status 404 car le 204 en retourne pas de message
+            return new JsonResponse('Produit introuvable', 404); //retourne un status 404 car le 204 ne retourne pas de message
         }
         return new JsonResponse($product);
     }
 
     //ADD
     #[Route('/product', name: 'product_add', methods: ['POST'])]
-    public function add(EntityManagerInterface $em, Request $request, ValidatorInterface $validator): Response
+    public function add(EntityManagerInterface $em, Request $request, Validator $validator, Product $product): Response
     {
-        $product = new Product();
-        $product->setTitle($request->get('title')); //récupére le paramétre 'title' de la requête et l'assigne de l'objet
-        $product->setPrice($request->get('price'));
-        $product->setQuantity($request->get('quantity'));
-        $category = $em->getRepository(Category::class)->find($request->get('category'));
-        $product->setCategory($category);
-
-        //Fait appel au validator
-        $errors = $validator->validate($product); //vérifie que l'objet soit conforme avec les validations demandées(assert)
-
-        if (count($errors)) {
-            $e_list = [];
-            //S'il y a au moins une erreur
-            foreach ($errors as $error) {
-                $e_list[] = $error->getMessage(); //on ajoute leur message dans le tableau
-            }
-            return new JsonResponse($e_list, 400); //on retourne le tableau des messages
+        if ($product == null) {
+            return new JsonResponse('Produit introuvable', 200);
         }
 
-        $em->persist($product);
-        $em->flush();
+        if ($request->get('category') != null) {
+            //Récupere en base la catégorie qui correspond au paramétre reçu
+            $category = $em->getRepository(Category::class)->find($request->get('category'));
 
-        return new JsonResponse('Success', 200);
+            //Si elle n'existe pas 
+            if ($category == null) {
+                return new JsonResponse('Catégorie introuvable', 404);
+            }
 
+            //Si elle existe, on l'assigne à l'objet
+            $product->setCategory($category);
+        }
+
+        if ($request->get('title') != null) {
+            $product->setTitle($request->get('title')); //récupére le paramétre 'title' de la requête et l'assigne de l'objet
+        }
+        if ($request->get('price') != null) {
+            $product->setPrice($request->get('price'));
+        }
+
+        if ($request->get('quantity') != null) {
+            $product->setQuantity($request->get('quantity'));
+        }
+
+        if ($request->get('category') != null) {
+            $product->setCategory($category);
+        }
+
+        //Faire les vérifications
+        $isValid = $validator->isValid($product);
+        if ($isValid !== true) {
+            return new JsonResponse($isValid, 400);
+        }
+
+        $em->persist($product); //prépare l'insertion en base
+        $em->flush(); //execute l'insertion en base
+
+        return new JsonResponse('ok', 200);
     }
 
     //UPDATE
     #[Route('/product/{id}', name: 'product_update', methods: ['PATCH'])]
-    public function update(Product $product = null, Request $request, ValidatorInterface $validator, EntityManagerInterface $em){
-        if($product === null){
+    public function update(Product $product = null, Request $request, Validator $validator, EntityManagerInterface $em)
+    {
+        if ($product === null) {
             return new JsonResponse('Produit introuvable', 404);
         }
         $params = 0;
-        if($request->get('title') !== null){
+        if ($request->get('title') !== null) {
+            $params++; // retourne erreur personnnaliser si aucune erreur retourner
             $product->setTitle($request->get('title'));
             $params++;
         }
-        if($request->get('price') !== null){
+        if ($request->get('price') !== null) {
+            $params++;
             $product->setPrice($request->get('price'));
             $params++;
         }
-        if($request->get('quantity') !== null){
+        if ($request->get('quantity') !== null) {
+            $params++;
             $product->setQuantity($request->get('quantity'));
             $params++;
         }
-        if($request->get('category') !== null){
+        if ($request->get('category') !== null) {
+            $params++;
             $category = $em->getRepository(Category::class)->find($request->get('category'));
             $product->setCategory($category);
             $params++;
         }
 
-        if($params > 0){
-            $errors = $validator->validate($product);
-            if(count($errors)){
-                $e_list = [];
-                foreach($errors as $error){
-                    $e_list[] = $error->getMessage();
-                }
-                return new JsonResponse($e_list, 400);
+        if ($params > 0) {
+            //Faire les vérifications
+            $isValid = $validator->isValid($product);
+            if ($isValid !== true) {
+                return new JsonResponse($isValid, 400);
             }
-            $em->persist($product);
-            $em->flush();
+
+            $em->persist($product); //prépare l'insertion en base
+            $em->flush(); //execute l'insertion en base
+
+            return new JsonResponse('Success', 200);
         } else {
-            return new JsonResponse('Aucun produit à modifier', 200);
+            return new JsonResponse('Aucune donnée reçue', 200);
         }
-        return new JsonResponse('Success', 200);
     }
 
     //DELETE
     #[Route('/product/{id}', name: 'product_delete', methods: ['DELETE'])]
-    public function delete(Product $product = null, EntityManagerInterface $em){
-        if($product === null){
+    public function delete(Product $product = null, EntityManagerInterface $em)
+    {
+        if ($product === null) {
             return new JsonResponse('Produit introuvable', 404);
         }
         $em->remove($product);
