@@ -37,7 +37,7 @@ class UserController extends AbstractController
         $key = $this->getParameter('jwt_secret');
         $payload = [
             'iat' => time(), //Issues at (date de création)
-            'exp' => time() + 1, //Expiration du token (date de création + x seconds)
+            'exp' => time() + 3600, //Expiration du token (date de création + x seconds)
             'roles' => $user->getRoles(), //Role de l'utilisateur
         ];
 
