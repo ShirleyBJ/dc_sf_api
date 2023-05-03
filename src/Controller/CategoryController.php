@@ -141,7 +141,7 @@ class CategoryController extends AbstractController
         $image = $request->files->get('image');
 
         if($image) {
-            $newFilename = uniqid().'.'.$image->guessExtension();
+            $newFilename =  uniqid().'.'.$image->guessExtension();
 
             //Move the file to the directory where brochures are stored
             try {
